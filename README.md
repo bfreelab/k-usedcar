@@ -18,12 +18,26 @@
 ## 구성
 ```
 skills/
-  encar/      # 엔카 (검색 API + readside 상세 API)
-  kcar/       # 케이카 (car-info-detail API / 렌더 카드)
-  kia-cpo/    # 기아 인증중고차 (api/search, product 상세)
-  heydealer/  # 헤이딜러 (마켓 카드 + 상세 텍스트 파싱)
+  encar/        # 엔카 (검색 API + readside 상세 API)
+  kcar/         # 케이카 (★headed 모드: 필터 클릭 + list API 후킹 → 색상·렌트까지)
+  kia-cpo/      # 기아 인증중고차 (api/search, product 상세)
+  heydealer/    # 헤이딜러 (★headed 모드: 모델 필터 후 카드/상세 텍스트 파싱)
+  report-html/  # 수집 결과 → 비교·추천 정적 HTML 생성 (PII 자동 제거)
 ```
-각 폴더의 `SKILL.md`에 호출 방법과 추출 로직, 주의사항이 있습니다.
+각 폴더의 `SKILL.md`에 호출 방법·추출 로직·주의사항이 있습니다.
+
+### 핵심 노하우 (수집 안정화)
+- **헤드(headed) 모드 권장.** 케이카·헤이딜러·현대인증 등은 헤드리스에서 가상스크롤·
+  로그인게이트·안티봇으로 목록이 안 잡힌다. 보이는 크롬에서 동작.
+- **필터 클릭은 `mousedown→mouseup→click` 풀 시퀀스 + 좌표** 디스패치(합성 click 단독은 무시될 수 있음).
+- **내부 list/search API 응답을 후킹**하면 색상·용도(렌트)·사고·변속기까지 목록 단계에서 확보 → 상세 호출 최소화.
+- 잘 안 되면 **스크린샷을 떠서 비전으로 UI를 보고** 좌표 클릭.
+
+## 개인정보·법무 (반드시)
+- [PRIVACY.md](./PRIVACY.md): 차량번호·딜러 연락처·이름 등 **PII는 추출 단계에서 즉시 제거**.
+  `report-html`도 PII 필드를 자동 무시한다(검증됨).
+- [DISCLAIMER.md](./DISCLAIMER.md): 약관/robots.txt 준수·개인정보 처리 책임은 이용자.
+  수집 데이터는 저장소에 커밋하지 않는다(`.gitignore`).
 
 ## 사전 요구
 - 헤드리스/헤드 브라우저 제어 도구 (예: [gstack `browse`](https://garryslist.org) 또는
