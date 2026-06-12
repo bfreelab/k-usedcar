@@ -5,16 +5,40 @@ description: 엔카(encar.com)에서 조건별 중고차 매물 목록을 조회
 
 # 엔카 중고차 조회 스킬
 
-브라우저로 엔카가 사용하는 조회 엔드포인트를 호출한다. 검색 결과 API는 CORS로
-XHR이 막히므로 **URL 직접 이동(navigation)으로 JSON을 수신**하고, 상세 데이터는
+브라우저로 엔카가 사용하는 조회 엔드포인트를 호출한다. 상세 데이터는
 모바일(`fem.encar.com`) 도메인에서 `api.encar.com/v1/readside/*`를 호출한다.
 
 ## 1) 매물 목록 검색 (전수 열거)
 검색 쿼리 문법(`q`)에 제조사/모델/연료/연식/가격/색상/옵션 필터를 조합한다.
 
 ```
-https://api.encar.com/search/car/list/general?count=true&q=<ENC>&sr=%7CModifiedDate%7C<offset>%7C<limit>
+https://api.encar.com/search/car/list/general?count=true&q=<q>&sr=%7CModifiedDate%7C<offset>%7C<limit>
 ```
+
+### ★호출 방식 — 직접 navigation이 막히면 fem 오리진 XHR (검증됨)
+- 예전엔 검색 API를 **URL 직접 이동(navigation)**으로 JSON 수신했으나, 안티봇 강화로
+  주소창 직접 이동이 **HTTP 400**으로 막히는 시기가 있다. 이때는:
+  **① `fem.encar.com`을 먼저 연 뒤 ② 그 페이지 컨텍스트에서 동기 XHR**로 검색 API를 호출하면 200.
+  (readside 상세 API와 같은 오리진이라 통과. `q`는 `encodeURIComponent`로 인코딩.)
+  ```js
+  // fem.encar.com 페이지에서 eval
+  var u="https://api.encar.com/search/car/list/general?count=true&q="+encodeURIComponent(q)+"&sr="+encodeURIComponent("|ModifiedDate|0|100");
+  var x=new XMLHttpRequest(); x.open('GET',u,false); x.send(null); JSON.parse(x.responseText);
+  ```
+- **문법 주의**: `Manufacturer`만 단독으로 두면 **400**(불완전 문법). 반드시
+  `Manufacturer.X._.(C.ModelGroup.Y._.Model.Z.)`까지 **중첩**해야 200. 잘못된 *값*은
+  400이 아니라 `Count:0`(200)으로 나오니, 400이면 *문법/계층*, count 0이면 *값*을 의심.
+
+### ★제조사·모델 문자열 발굴 (메타데이터를 모를 때)
+정확한 한글 제조사/모델 표기를 모르면(특히 수입·르노 등), 넓은 검색 후 결과의
+`Manufacturer`/`Model` 필드를 스캔해 실제 표기를 찾는다:
+```js
+// q="(And.Hidden.N._.CarType.Y.)" 로 100건씩 받아 르노 등 키워드 매칭
+results.filter(r=>/르노|QM6/.test(r.Manufacturer+r.Model))
+```
+예) QM6의 정확한 표기는 **제조사 `르노코리아(삼성)`**, 모델 `QM6`/`더 뉴 QM6`.
+(제조사명에 괄호가 있어도 `encodeURIComponent`는 `()`를 인코딩하지 않아 쿼리에 그대로 들어가며 동작한다.)
+
 - `q` 예: `(And.Hidden.N._.(C.CarType.Y._.(C.Manufacturer.기아._.(C.ModelGroup.스포티지._.Model.스포티지 5세대.)))_.Color.흰색._.Price.range(..2700).)`
 - 범위: `Year.range(202101..202412)`, `Mileage.range(30000..100000)`, `Price.range(1800..2400)`
 - 엔카진단/믿고만: `_.(Or.ServiceMark.EncarDiagnosisP0._.ServiceMark.EncarDiagnosisP1._.ServiceMark.EncarDiagnosisP2._.ServiceMark.EncarMeetgo.)`
